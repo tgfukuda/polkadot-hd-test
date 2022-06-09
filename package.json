@@ -1,0 +1,16 @@
+{
+  "name": "polkadot-js-sample",
+  "type": "module",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@polkadot/api": "^8.7.1",
+    "@substrate/txwrapper-polkadot": "^3.1.1",
+    "ed25519-hd-key": "^1.2.0",
+    "hdkey": "^2.0.1"
+  },
+  "scripts": {
+    "run:signer": "./node_modules/@polkadot/signer-cli/index.cjs"
+  }
+}
