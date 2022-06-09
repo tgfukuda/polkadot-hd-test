@@ -38,11 +38,11 @@ class Wallet {
         this.keyringPair = keyring.createFromPair(keyPair, {}, sigType);
 
         if (true) {
-            console.log(`
-                address: ${this.address}
-                xpriv  : ${u8aToHex(this.keyPair.secretKey)}
-                xpub   : ${u8aToHex(this.keyPair.publicKey)}
-            `)
+            console.log(
+                `address: ${this.address}\n` + 
+                `xpriv  : ${u8aToHex(this.keyPair.secretKey)}\n` +
+                `xpub   : ${u8aToHex(this.keyPair.publicKey)}\n`
+            )
         }
     }
 
@@ -102,9 +102,10 @@ class Wallet {
             registry,
         });
         console.log(
-            `\nDecoded Transaction\n` + 
+            `\nDecoded Unsined Transaction\n` + 
                 `  To: ${(decodedUnsigned.method.args.dest)?.id}\n` +
-                `  Amount: ${decodedUnsigned.method.args.value}\n`
+                `  Amount: ${decodedUnsigned.method.args.value}\n` +
+                decodedUnsigned,
         );
 
         const sigPayload = wtx.construct.signingPayload(utx, { metadataRpc, registry });
@@ -113,9 +114,10 @@ class Wallet {
             registry,
         });
         console.log(
-            `\nDecoded Transaction\n` +
+            `\nDecoded Transaction Payload\n` +
                 `  To: ${(payloadInfo.method.args.dest)?.id}\n` +
-                `  Amount: ${payloadInfo.method.args.value}\n`
+                `  Amount: ${payloadInfo.method.args.value}\n` +
+                payloadInfo
         );
     
         const extrinsicPayload = registry.createType('ExtrinsicPayload', sigPayload, {
@@ -138,11 +140,12 @@ class Wallet {
         console.log(
             `\nDecoded Transaction\n`+
                 `  To: ${(txInfo.method.args.dest)?.id}\n` +
-                `  Amount: ${txInfo.method.args.value}\n`
+                `  Amount: ${txInfo.method.args.value}\n` +
+                txInfo
         );
 
         const actualTx = await api.rpc.author.submitExtrinsic(api.createType('Extrinsic', tx));
-        console.log("actual tx hash:", actualTx.toHex());
+        console.log("\nactual tx hash:", actualTx.toHex());
 
         await api.disconnect();
     }
