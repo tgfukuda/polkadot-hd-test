@@ -16,7 +16,7 @@ const TYPE_ADDRESS = {
 // generate address with given HDPath according to BIP32
 // sign unsigned transaction
 // verify signed transaction
-class ColdWallet {
+export class ColdWallet {
     hdkey;
     ss58Format;
     sigType;
@@ -48,16 +48,6 @@ class ColdWallet {
         const keyringPair = this.getKeyringPair(index)
         const signature = keyringPair.sign(payload, { withType: true });
         const verified = this.verifySignature(payload, signature, index);
-        console.log(verified);
         return u8aToHex(signature)
     }
 }
-
-const wallet = new ColdWallet(xprv, 42);
-
-for (let i = 0; i <= 10; i++) {
-    console.log(`index: ${i}: ${wallet.generateAddress(i)}`);
-}
-
-const result = wallet.signTx("0x04030068642b768476c83f685947efeeb40df8dd381dd6acef49614b268355ef41107302093d00a50318000e2400000b000000e143f23803ac50e8f6f8e62695d1ce9e4e1d68aa36c1cd2cfd15340213f3423e6e4ca8d8c5a4d3184c7ca6ebe5108f477fcd88f3441f653df17c5b1a3fb8ab70", 0);
-console.log("signedTx", result)

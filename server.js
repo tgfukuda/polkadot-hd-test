@@ -5,8 +5,9 @@ import wtx from '@substrate/txwrapper-polkadot'
 import { signatureVerify, blake2AsU8a } from '@polkadot/util-crypto';
 import { u8aToHex } from '@polkadot/util';
 
-const xprv = 'xprv9xzjfWD4jQawLFRuvj7F1mLgAmFXmVeFiAjKCasAkST495HKf6Ug28aRasRxyrnDQSJUj3Wj7kxvBirtDmAyR8cDfRQgRTWWYmyvG2NHwmF'
-const xpub = 'xpub6BxS8hHq2pPeFcdC5xg8pzdKqmPcK4xSspn2992gpHj4WvyLd3Y3URdUpXqECnkKWFu7cvJXUQiGRhNwAFno1NXSyU5FVtQmGPpDwsijfdH';
+import { ColdWallet } from './coldWallet.js';
+const xprv = 'xprvA1pXchSD4UUY78FYVa7RsnWzz437a4QeX1i2e22AcgGmWJ9gEyh9XkSBtWjHXF63UTuAg6MgBqMwT8fGnGAH2StPwwzwCBBRKtPUnqbf7GP'
+const xpub = 'xpub6Eot2Cy6tr2qKcL1bbeSEvTjY5sbyX8VtEddSQRnB1okP6UpnX1Q5YkfjndnhmoGX9fVMxGxzi9HiKCSDKhbMmMTMFCRZ7PuoUjXLWuqfYR';
 const TYPE_ADDRESS = {
     ecdsa: p => p.length > 32 ? blake2AsU8a(p) : p,
     ed25519: p => p,
@@ -111,7 +112,6 @@ class ServerWallet {
             metadataRpc,
             registry
         });
-        this.broadcast(tx);
         return tx
     }
 
@@ -119,7 +119,7 @@ class ServerWallet {
         const api = await this.getRpc()
         const registry = api.registry;
         const metadataRpc = await api.rpc.state.getMetadata();
-
+        registry.setMetadata(metadataRpc);
         // Decode a signed payload.
         const txInfo = wtx.decode(signedTx, {
             metadataRpc,
@@ -132,20 +132,37 @@ class ServerWallet {
         );
 
         const actualTx = await api.rpc.author.submitExtrinsic(api.createType('Extrinsic', signedTx));
-        console.log("\nactual tx hash:", actualTx.toHex());
-
         await api.disconnect();
         return actualTx.toHex()
     }
 }
 
-const wallet = new ServerWallet(xprv, 42);
+// Instantiate wallet on server side with xPub.
+const wallet = new ServerWallet(xpub, 42);
 
+
+// Check that it can generate addresses just with xPub
 for (let i = 0; i <= 10; i++) {
     console.log(`index: ${i}: ${wallet.generateAddress(i)}`);
 }
-const unsigned = await wallet.createUnsignedTx(wallet.generateAddress(0),"5ERabPpv3puKx6fVDYTgUcHz8C8xXwNPGE7sjfdeFKBV6uJb", 1000000);
+
+// Send some funds
+const index = 0
+
+// store the result into db
+const unsigned = await wallet.createUnsignedTx(wallet.generateAddress(index),"5ERabPpv3puKx6fVDYTgUcHz8C8xXwNPGE7sjfdeFKBV6uJb", 1000000);
 console.log(unsigned.payload)
-const result = await wallet.constructTx(unsigned.unsignedTx, "0x025c2effb16ed7f9f6a700e8b9b72bf80c2a0f34151a7f5895957a48a25407b1f23364b7fa1590d8f0b91b29bfc0778c536751f72a1fa9f4fc7fc89f973969b81401");
+
+// Sign the payload with cold wallet
+// In production, this is done on a seperate machine
+const coldWallet = new ColdWallet(xprv, 42)
+const signature = coldWallet.signTx(unsigned.payload, index)
+
+// Return the signature to the server
+// The server will concatinate the transaction with the signature
+const signedTx = await wallet.constructTx(unsigned.unsignedTx, signature);
+
+// Broadcast the tx
+const result = await wallet.broadcast(signedTx);
 
 console.log(result);
