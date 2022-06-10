@@ -7,6 +7,7 @@ import { signatureVerify,encodeAddress, blake2AsU8a } from '@polkadot/util-crypt
 
 const xprv = 'xprv9xzjfWD4jQawLFRuvj7F1mLgAmFXmVeFiAjKCasAkST495HKf6Ug28aRasRxyrnDQSJUj3Wj7kxvBirtDmAyR8cDfRQgRTWWYmyvG2NHwmF'
 
+/** address convertor */
 const TYPE_ADDRESS = {
     ecdsa: p => p.length > 32 ? blake2AsU8a(p) : p,
     ed25519: p => p,
@@ -14,14 +15,16 @@ const TYPE_ADDRESS = {
     sr25519: p => p
   };
 
+/**
+ * wallet is responsible for deriving keys and store them.
+ */
 class Wallet {
     keyringPair;
     address;
     keyPair;
 
     constructor (xprv, ss58Format) {
-        // Construct
-
+        /** key derivation */
         const hdkey = HdKey.fromExtendedKey(xprv);
         const derivedKey = hdkey.derive("m/44/354/0/0/0");
 
@@ -37,6 +40,7 @@ class Wallet {
         this.keyPair = keyPair;
         this.keyringPair = keyring.createFromPair(keyPair, {}, sigType);
 
+        /** for debug */
         if (true) {
             console.log(
                 `address: ${this.address}\n` + 
@@ -58,11 +62,13 @@ class Wallet {
         return this.keyringPair;
     }
 
+    /** testing purpose. do nothing */
     signAndVerify(message) {
         const sig = this.keyringPair.sign(message);
         return signatureVerify(message, sig, this.address);
     }
 
+    /** get rpc instance */
     async getRpc() {
         const wsProvider = new WsProvider('wss://westend-rpc.polkadot.io');
         return await ApiPromise.create({ provider: wsProvider })
@@ -71,6 +77,7 @@ class Wallet {
     async createTx(transferArg, baseArgExt) {
         const api = await this.getRpc()
 
+        /** get metadata */
         const { block } = await api.rpc.chain.getBlock();
         const blockHash = await api.rpc.chain.getBlockHash();
         const genesisHash = await api.rpc.chain.getBlockHash(0);
@@ -79,9 +86,19 @@ class Wallet {
 
         const nonce = await api.rpc.system.accountNextIndex(this.address);
 
+        /** registry has type information about rpc apis (possibly and others) */
         const registry = api.registry;
         registry.setMetadata(metadataRpc);
 
+        /**
+         * create unsigned tx
+         * transferArg: {
+         *      value: number,
+         *      dest : address(string)
+         * }
+         * second parameters are basic information about transaction like nonce
+         * third parameters are meta data
+         */
         const utx = wtx.methods.balances.transferKeepAlive(transferArg, {
             address: this.address,
             blockHash,
@@ -108,6 +125,9 @@ class Wallet {
                 decodedUnsigned,
         );
 
+        /**
+         * sig payload is the string which is the message to sign.
+         */
         const sigPayload = wtx.construct.signingPayload(utx, { metadataRpc, registry });
         const payloadInfo = wtx.decode(sigPayload, {
             metadataRpc,
@@ -120,11 +140,22 @@ class Wallet {
                 payloadInfo
         );
     
+        /**
+         * add transaction payload to utx
+         */
         const extrinsicPayload = registry.createType('ExtrinsicPayload', sigPayload, {
 			version: utx.version,
 		});
+        /**
+         * sign tx with keys
+         * signature is a hex string
+         */
         const { signature } = extrinsicPayload.sign(this.keyringPair);
 
+        /**
+         * pack utx with signature and send it.
+         * returned value is tx hex data.
+         */
         const tx = wtx.construct.signedTx(utx, signature, {
             metadataRpc,
             registry
@@ -132,7 +163,6 @@ class Wallet {
         console.log(`\nTransaction to Submit: ${tx}`);
         console.log("expected tx hash:", wtx.construct.txHash(tx));
 
-        // Decode a signed payload.
         const txInfo = wtx.decode(tx, {
             metadataRpc,
             registry,
@@ -144,6 +174,9 @@ class Wallet {
                 txInfo
         );
 
+        /**
+         * get transaction result as a hashed value
+         */
         const actualTx = await api.rpc.author.submitExtrinsic(api.createType('Extrinsic', tx));
         console.log("\nactual tx hash:", actualTx.toHex());
 
