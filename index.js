@@ -67,6 +67,12 @@ class Wallet {
         const sig = this.keyringPair.sign(message);
         return signatureVerify(message, sig, this.address);
     }
+}
+
+class HotWallet extends Wallet {
+    constructor(xprv, ss58Format) {
+        super(xprv, ss58Format)
+    }
 
     /** get rpc instance */
     async getRpc() {
@@ -121,8 +127,7 @@ class Wallet {
         console.log(
             `\nDecoded Unsined Transaction\n` + 
                 `  To: ${(decodedUnsigned.method.args.dest)?.id}\n` +
-                `  Amount: ${decodedUnsigned.method.args.value}\n` +
-                decodedUnsigned,
+                `  Amount: ${decodedUnsigned.method.args.value}\n`
         );
 
         /**
@@ -136,8 +141,7 @@ class Wallet {
         console.log(
             `\nDecoded Transaction Payload\n` +
                 `  To: ${(payloadInfo.method.args.dest)?.id}\n` +
-                `  Amount: ${payloadInfo.method.args.value}\n` +
-                payloadInfo
+                `  Amount: ${payloadInfo.method.args.value}\n`
         );
     
         /**
@@ -182,10 +186,49 @@ class Wallet {
 
         await api.disconnect();
     }
+
+    async sendBatchTx(balance, ...addresses) {
+        const api = await this.getRpc();
+        const txs = addresses.map((addr) => api.tx.balances.transfer(addr, balance));
+        console.log(txs);
+        
+        const txHash = await api
+            .tx
+            .utility
+            .batch(txs)
+            .signAndSend(this.keyringPair);
+        
+        await api.disconnect();
+
+        return txHash;
+    }
 }
 
-const wallet = new Wallet(xprv, 42);
-wallet.createTx({
-    value: 1000000,
-    dest: "5ERabPpv3puKx6fVDYTgUcHz8C8xXwNPGE7sjfdeFKBV6uJb"
-});
+class ColdWallet extends Wallet {
+    constructor(xprv, ss58Format) {
+        super(xprv, ss58Format)
+    }
+
+    signTx(payload) {
+        const registry = new wtx.TypeRegistry();
+        const extrinsicPayload = registry.createType('ExtrinsicPayload', payload, {
+			version: utx.version,
+		});
+
+        const signedTx = extrinsicPayload.sign(this.keyringPair);
+        return signedTx;
+    }
+}
+
+const hot = new HotWallet(xprv, 42);
+// hot.createTx({
+//     value: 1000000,
+//     dest: "5ERabPpv3puKx6fVDYTgUcHz8C8xXwNPGE7sjfdeFKBV6uJb"
+// });
+
+hot.sendBatchTx(1000000, "5GXKXvhyrptx1Az2RDLGwYLws9BXYWzKFzy6uc9FYaTfrjf2", "5EPKJMxi2xPqBgKGAXYWSyZWcgFsYwGHg757jTexUp8WyQEr")
+    .then((hash) => console.log("tx hash:", u8aToHex(hash)))
+    .catch((err) => console.error(err));
+
+// const cold = new ColdWallet(xprv, 42);
+// cold.signTx()
