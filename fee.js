@@ -12,13 +12,11 @@ const getRpc = async (uri) => {
 /**
  * 
  * @param {ApiPromise} api 
- * @param {string} block 
- * @param {number} index 
+ * @param {string} blockHash
+ * @param {string} txHash
  */
 const getUsedFee = async (api, blockHash, txHash)=> {
     const signedBlock = await api.rpc.chain.getBlock(blockHash);
-    const apiAt = await api.at(signedBlock.block.hash);
-    const allRecords = await apiAt.query.system.events();
 
     Promise.all(
         signedBlock.block.extrinsics
@@ -29,9 +27,9 @@ const getUsedFee = async (api, blockHash, txHash)=> {
             const fees = detail.toJSON().inclusionFee;
             const totalFee = Object.values(fees).reduce((fee, sum) => sum + fee, 0);
             console.log(totalFee);
-        })
+        });
     }).catch((err) => console.log(err))
-    .finally(async () => await api.disconnect())
+    .finally(async () => await api.disconnect());
 }
 
 getRpc(westend)
